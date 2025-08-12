@@ -96,11 +96,11 @@ spec:
         - name: GATEWAY_REDUNDANCY_ROLE
           value: "master"
         # Configuration SQL Server
-        - name: GATEWAY_JDBC_URL
+        - name: GATEWAY_DATASOURCE_URL
           value: "jdbc:sqlserver://sql-server-service.database.svc.cluster.local:1433;databaseName=IgnitionSCADA;encrypt=false;trustServerCertificate=true"
-        - name: GATEWAY_JDBC_USERNAME
+        - name: GATEWAY_DATASOURCE_USERNAME
           value: "sa"
-        - name: GATEWAY_JDBC_PASSWORD
+        - name: GATEWAY_DATASOURCE_PASSWORD
           valueFrom:
             secretKeyRef:
               name: ignition-sql-credentials
@@ -187,11 +187,11 @@ spec:
         - name: GATEWAY_REDUNDANCY_MASTER_HOSTNAME
           value: "ignition-master-service.ignition.svc.cluster.local"
         # Configuration SQL Server
-        - name: GATEWAY_JDBC_URL
+        - name: GATEWAY_DATASOURCE_URL
           value: "jdbc:sqlserver://sql-server-service.database.svc.cluster.local:1433;databaseName=IgnitionSCADA;encrypt=false;trustServerCertificate=true"
-        - name: GATEWAY_JDBC_USERNAME
+        - name: GATEWAY_DATASOURCE_USERNAME
           value: "sa"
-        - name: GATEWAY_JDBC_PASSWORD
+        - name: GATEWAY_DATASOURCE_PASSWORD
           valueFrom:
             secretKeyRef:
               name: ignition-sql-credentials
