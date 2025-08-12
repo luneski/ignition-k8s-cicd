@@ -3,20 +3,6 @@ kind: Namespace
 metadata:
   name: ignition
 ---
-# PVC partagé pour la synchronisation
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: ignition-shared-storage
-  namespace: ignition
-spec:
-  accessModes:
-    - ReadWriteMany
-  resources:
-    requests:
-      storage: 10Gi
-  storageClassName: local-path
----
 # PVC pour le Master
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -110,22 +96,17 @@ spec:
         volumeMounts:
         - name: master-data
           mountPath: /usr/local/bin/ignition/data
-        - name: shared-storage
-          mountPath: /usr/local/bin/ignition/data/redundancy
         resources:
           requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
             memory: "1Gi"
             cpu: "500m"
-          limits:
-            memory: "2Gi"
-            cpu: "1000m"
       volumes:
       - name: master-data
         persistentVolumeClaim:
           claimName: ignition-master-storage
-      - name: shared-storage
-        persistentVolumeClaim:
-          claimName: ignition-shared-storage
 ---
 # Deployment Backup Gateway
 apiVersion: apps/v1
@@ -194,22 +175,17 @@ spec:
         volumeMounts:
         - name: backup-data
           mountPath: /usr/local/bin/ignition/data
-        - name: shared-storage
-          mountPath: /usr/local/bin/ignition/data/redundancy
         resources:
           requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
             memory: "1Gi"
             cpu: "500m"
-          limits:
-            memory: "2Gi"
-            cpu: "1000m"
       volumes:
       - name: backup-data
         persistentVolumeClaim:
           claimName: ignition-backup-storage
-      - name: shared-storage
-        persistentVolumeClaim:
-          claimName: ignition-shared-storage
 ---
 # Service Master Gateway
 apiVersion: v1
