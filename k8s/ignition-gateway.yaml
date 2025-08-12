@@ -1,42 +1,101 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ignition
+---
+# PVC partagé pour la synchronisation
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: ignition-shared-storage
+  namespace: ignition
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 10Gi
+  storageClassName: local-path
+---
+# PVC pour le Master
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: ignition-master-storage
+  namespace: ignition
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+  storageClassName: local-path
+---
+# PVC pour le Backup
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: ignition-backup-storage
+  namespace: ignition
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+  storageClassName: local-path
+---
+# Deployment Master Gateway
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: ignition-gateway
+  name: ignition-master
   namespace: ignition
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
-      app: ignition-gateway
+      app: ignition-master
   template:
     metadata:
       labels:
-        app: ignition-gateway
+        app: ignition-master
     spec:
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchExpressions:
+              - key: app
+                operator: In
+                values: ["ignition-master", "ignition-backup"]
+            topologyKey: kubernetes.io/hostname
       initContainers:
-      - name: init-ignition-data
+      - name: init-master-data
         image: inductiveautomation/ignition:latest
         command: ['sh', '-c']
         args:
           - |
             if [ ! -f /persistent-data/gateway.xml_clean ]; then
-              echo "First run detected - copying Ignition system files..."
+              echo "First run detected - copying Ignition system files for Master..."
               cp -r /usr/local/bin/ignition/data/* /persistent-data/
-              echo "Copy completed!"
+              echo "Master copy completed!"
             else
-              echo "System files already present, skipping copy."
+              echo "Master system files already present, skipping copy."
             fi
         volumeMounts:
-        - name: gateway-data
+        - name: master-data
           mountPath: /persistent-data
       containers:
-      - name: ignition-gateway
+      - name: ignition-master
         image: inductiveautomation/ignition:latest
         ports:
         - containerPort: 8088
           name: http
         - containerPort: 8043
           name: https
+        - containerPort: 8060
+          name: redundancy
         env:
         - name: GATEWAY_ADMIN_PASSWORD
           value: "password"
@@ -44,9 +103,15 @@ spec:
           value: "standard"
         - name: TZ
           value: "Europe/Paris"
+        - name: GATEWAY_REDUNDANCY_ENABLED
+          value: "true"
+        - name: GATEWAY_REDUNDANCY_ROLE
+          value: "master"
         volumeMounts:
-        - name: gateway-data
+        - name: master-data
           mountPath: /usr/local/bin/ignition/data
+        - name: shared-storage
+          mountPath: /usr/local/bin/ignition/data/redundancy
         resources:
           requests:
             memory: "1Gi"
@@ -55,18 +120,106 @@ spec:
             memory: "2Gi"
             cpu: "1000m"
       volumes:
-      - name: gateway-data
+      - name: master-data
         persistentVolumeClaim:
-          claimName: ignition-storage
+          claimName: ignition-master-storage
+      - name: shared-storage
+        persistentVolumeClaim:
+          claimName: ignition-shared-storage
 ---
+# Deployment Backup Gateway
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ignition-backup
+  namespace: ignition
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ignition-backup
+  template:
+    metadata:
+      labels:
+        app: ignition-backup
+    spec:
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchExpressions:
+              - key: app
+                operator: In
+                values: ["ignition-master", "ignition-backup"]
+            topologyKey: kubernetes.io/hostname
+      initContainers:
+      - name: init-backup-data
+        image: inductiveautomation/ignition:latest
+        command: ['sh', '-c']
+        args:
+          - |
+            if [ ! -f /persistent-data/gateway.xml_clean ]; then
+              echo "First run detected - copying Ignition system files for Backup..."
+              cp -r /usr/local/bin/ignition/data/* /persistent-data/
+              echo "Backup copy completed!"
+            else
+              echo "Backup system files already present, skipping copy."
+            fi
+        volumeMounts:
+        - name: backup-data
+          mountPath: /persistent-data
+      containers:
+      - name: ignition-backup
+        image: inductiveautomation/ignition:latest
+        ports:
+        - containerPort: 8088
+          name: http
+        - containerPort: 8043
+          name: https
+        - containerPort: 8060
+          name: redundancy
+        env:
+        - name: GATEWAY_ADMIN_PASSWORD
+          value: "password"
+        - name: IGNITION_EDITION
+          value: "standard"
+        - name: TZ
+          value: "Europe/Paris"
+        - name: GATEWAY_REDUNDANCY_ENABLED
+          value: "true"
+        - name: GATEWAY_REDUNDANCY_ROLE
+          value: "backup"
+        - name: GATEWAY_REDUNDANCY_MASTER_HOSTNAME
+          value: "ignition-master-service.ignition.svc.cluster.local"
+        volumeMounts:
+        - name: backup-data
+          mountPath: /usr/local/bin/ignition/data
+        - name: shared-storage
+          mountPath: /usr/local/bin/ignition/data/redundancy
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "500m"
+          limits:
+            memory: "2Gi"
+            cpu: "1000m"
+      volumes:
+      - name: backup-data
+        persistentVolumeClaim:
+          claimName: ignition-backup-storage
+      - name: shared-storage
+        persistentVolumeClaim:
+          claimName: ignition-shared-storage
+---
+# Service Master Gateway
 apiVersion: v1
 kind: Service
 metadata:
-  name: ignition-gateway-service
+  name: ignition-master-service
   namespace: ignition
 spec:
   selector:
-    app: ignition-gateway
+    app: ignition-master
   ports:
   - name: http
     port: 8088
@@ -76,17 +229,30 @@ spec:
     port: 8043
     targetPort: 8043
     nodePort: 30043
+  - name: redundancy
+    port: 8060
+    targetPort: 8060
   type: NodePort
 ---
+# Service Backup Gateway
 apiVersion: v1
-kind: PersistentVolumeClaim
+kind: Service
 metadata:
-  name: ignition-storage
+  name: ignition-backup-service
   namespace: ignition
 spec:
-  accessModes:
-    - ReadWriteOnce
-  resources:
-    requests:
-      storage: 5Gi
-  storageClassName: local-path
+  selector:
+    app: ignition-backup
+  ports:
+  - name: http
+    port: 8088
+    targetPort: 8088
+    nodePort: 30089
+  - name: https
+    port: 8043
+    targetPort: 8043
+    nodePort: 30044
+  - name: redundancy
+    port: 8060
+    targetPort: 8060
+  type: NodePort
