@@ -93,16 +93,26 @@ spec:
           value: "true"
         - name: GATEWAY_REDUNDANCY_ROLE
           value: "master"
+        # Configuration SQL Server
+        - name: GATEWAY_JDBC_URL
+          value: "jdbc:sqlserver://sql-server-service.database.svc.cluster.local:1433;databaseName=IgnitionSCADA;encrypt=false;trustServerCertificate=true"
+        - name: GATEWAY_JDBC_USERNAME
+          value: "sa"
+        - name: GATEWAY_JDBC_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: ignition-sql-credentials
+              key: sql_password
         volumeMounts:
         - name: master-data
           mountPath: /usr/local/bin/ignition/data
         resources:
           requests:
             memory: "512Mi"
-            cpu: "500m"
+            cpu: "250m"
           limits:
             memory: "1Gi"
-            cpu: "600m"
+            cpu: "500m"
       volumes:
       - name: master-data
         persistentVolumeClaim:
@@ -172,16 +182,26 @@ spec:
           value: "backup"
         - name: GATEWAY_REDUNDANCY_MASTER_HOSTNAME
           value: "ignition-master-service.ignition.svc.cluster.local"
+        # Configuration SQL Server
+        - name: GATEWAY_JDBC_URL
+          value: "jdbc:sqlserver://sql-server-service.database.svc.cluster.local:1433;databaseName=IgnitionSCADA;encrypt=false;trustServerCertificate=true"
+        - name: GATEWAY_JDBC_USERNAME
+          value: "sa"
+        - name: GATEWAY_JDBC_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: ignition-sql-credentials
+              key: sql_password
         volumeMounts:
         - name: backup-data
           mountPath: /usr/local/bin/ignition/data
         resources:
           requests:
             memory: "512Mi"
-            cpu: "500m"
+            cpu: "250m"
           limits:
             memory: "1Gi"
-            cpu: "600m"
+            cpu: "500m"
       volumes:
       - name: backup-data
         persistentVolumeClaim:

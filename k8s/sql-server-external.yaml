@@ -1,0 +1,107 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: database
+---
+# Secret pour SQL Server
+apiVersion: v1
+kind: Secret
+metadata:
+  name: sql-server-credentials
+  namespace: database
+type: Opaque
+data:
+  # sa_password = "Sanofi123!" (encodé en base64)
+  sa_password: U2Fub2ZpMTIzIQ==
+---
+# PVC pour les données SQL Server
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: sql-server-data
+  namespace: database
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+  storageClassName: local-path
+---
+# Deployment SQL Server
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sql-server
+  namespace: database
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sql-server
+  template:
+    metadata:
+      labels:
+        app: sql-server
+    spec:
+      containers:
+      - name: sql-server
+        image: mcr.microsoft.com/mssql/server:2022-latest
+        ports:
+        - containerPort: 1433
+          name: sql
+        env:
+        - name: ACCEPT_EULA
+          value: "Y"
+        - name: MSSQL_SA_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: sql-server-credentials
+              key: sa_password
+        - name: MSSQL_DATA_DIR
+          value: "/var/opt/mssql/data"
+        - name: MSSQL_LOG_DIR
+          value: "/var/opt/mssql/log"
+        - name: MSSQL_BACKUP_DIR
+          value: "/var/opt/mssql/backup"
+        volumeMounts:
+        - name: sql-data
+          mountPath: /var/opt/mssql
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "500m"
+          limits:
+            memory: "2Gi"
+            cpu: "1000m"
+        livenessProbe:
+          tcpSocket:
+            port: 1433
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          tcpSocket:
+            port: 1433
+          initialDelaySeconds: 30
+          periodSeconds: 5
+      volumes:
+      - name: sql-data
+        persistentVolumeClaim:
+          claimName: sql-server-data
+---
+# Service pour SQL Server (IP fixe interne)
+apiVersion: v1
+kind: Service
+metadata:
+  name: sql-server-service
+  namespace: database
+spec:
+  selector:
+    app: sql-server
+  ports:
+  - name: sql
+    port: 1433
+    targetPort: 1433
+  type: ClusterIP
+  # IP fixe pour simuler une DB externe
+  clusterIP: 10.43.100.10
