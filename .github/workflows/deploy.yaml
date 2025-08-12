@@ -1,0 +1,35 @@
+name: Deploy Ignition to K3s
+
+on:
+  push:
+    branches: [ main ]
+    paths: [ 'k8s/**' ]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup kubectl
+      uses: azure/setup-kubectl@v3
+      with:
+        version: 'latest'
+        
+    - name: Configure kubectl
+      run: |
+        mkdir -p ~/.kube
+        echo "${{ secrets.KUBE_CONFIG }}" | base64 -d > ~/.kube/config
+        
+    - name: Deploy to K3s
+      run: |
+        kubectl apply -f k8s/
+        kubectl rollout status deployment/ignition-gateway -n ignition --timeout=300s
+        
+    - name: Show deployment status
+      run: |
+        kubectl get pods -n ignition
+        kubectl get services -n ignition
