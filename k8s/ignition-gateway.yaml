@@ -102,7 +102,7 @@ spec:
             cpu: "500"
           limits:
             memory: "1Gi"
-            cpu: "750"
+            cpu: "600"
       volumes:
       - name: master-data
         persistentVolumeClaim:
@@ -181,7 +181,7 @@ spec:
             cpu: "500"
           limits:
             memory: "1Gi"
-            cpu: "750"
+            cpu: "600"
       volumes:
       - name: backup-data
         persistentVolumeClaim:
