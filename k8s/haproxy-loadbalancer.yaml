@@ -18,10 +18,12 @@ data:
         option httplog
         log global
         
-    # Interface web HAProxy (optionnel)
-    stats enable
-    stats uri /haproxy-stats
-    stats refresh 30s
+    # Interface web HAProxy stats
+    frontend stats
+        bind *:8404
+        stats enable
+        stats uri /haproxy-stats
+        stats refresh 30s
     
     # Frontend - point d'entrée unique
     frontend ignition_frontend
@@ -77,14 +79,14 @@ spec:
             cpu: "200m"
         livenessProbe:
           httpGet:
-            path: /haproxy-stats
-            port: 8404
+            path: /
+            port: 8080
           initialDelaySeconds: 30
           periodSeconds: 10
         readinessProbe:
           httpGet:
-            path: /haproxy-stats
-            port: 8404
+            path: /
+            port: 8080
           initialDelaySeconds: 5
           periodSeconds: 5
       volumes:
