@@ -1,0 +1,113 @@
+# ConfigMap pour la configuration HAProxy
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: haproxy-config
+  namespace: ignition
+data:
+  haproxy.cfg: |
+    global
+        daemon
+        log stdout local0 info
+        
+    defaults
+        mode http
+        timeout connect 5000ms
+        timeout client 50000ms
+        timeout server 50000ms
+        option httplog
+        log global
+        
+    # Interface web HAProxy (optionnel)
+    stats enable
+    stats uri /haproxy-stats
+    stats refresh 30s
+    
+    # Frontend - point d'entrée unique
+    frontend ignition_frontend
+        bind *:8080
+        default_backend ignition_backend
+        
+    # Backend - logique de failover
+    backend ignition_backend
+        # Health check sur la page d'accueil Ignition
+        option httpchk GET /
+        http-check expect status 200
+        
+        # Serveurs avec priorités
+        # Master: priority 100 (préféré)
+        # Backup: priority 50 (fallback)
+        server ignition-master ignition-master-service.ignition.svc.cluster.local:8088 check inter 5s rise 2 fall 3 weight 100
+        server ignition-backup ignition-backup-service.ignition.svc.cluster.local:8088 check inter 5s rise 2 fall 3 weight 0 backup
+---
+# Deployment HAProxy
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: haproxy-lb
+  namespace: ignition
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: haproxy-lb
+  template:
+    metadata:
+      labels:
+        app: haproxy-lb
+    spec:
+      containers:
+      - name: haproxy
+        image: haproxy:2.8-alpine
+        ports:
+        - containerPort: 8080
+          name: http
+        - containerPort: 8404
+          name: stats
+        volumeMounts:
+        - name: haproxy-config
+          mountPath: /usr/local/etc/haproxy/haproxy.cfg
+          subPath: haproxy.cfg
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "100m"
+          limits:
+            memory: "128Mi"
+            cpu: "200m"
+        livenessProbe:
+          httpGet:
+            path: /haproxy-stats
+            port: 8404
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /haproxy-stats
+            port: 8404
+          initialDelaySeconds: 5
+          periodSeconds: 5
+      volumes:
+      - name: haproxy-config
+        configMap:
+          name: haproxy-config
+---
+# Service pour exposer HAProxy
+apiVersion: v1
+kind: Service
+metadata:
+  name: ignition-ha-service
+  namespace: ignition
+spec:
+  selector:
+    app: haproxy-lb
+  ports:
+  - name: http
+    port: 8080
+    targetPort: 8080
+    nodePort: 30080
+  - name: stats
+    port: 8404
+    targetPort: 8404
+    nodePort: 30404
+  type: NodePort
