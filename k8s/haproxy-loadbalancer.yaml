@@ -31,16 +31,10 @@ data:
         default_backend ignition_backend
         
     # Backend - logique de failover
-    backend ignition_backend
-        # Health check sur la page d'accueil Ignition
-        option httpchk GET /
-        http-check expect status 200
-        
-        # Serveurs avec priorités
-        # Master: priority 100 (préféré)
-        # Backup: priority 50 (fallback)
-        server ignition-master ignition-master-service.ignition.svc.cluster.local:8088 check inter 5s rise 2 fall 3 weight 100
-        server ignition-backup ignition-backup-service.ignition.svc.cluster.local:8088 check inter 5s rise 2 fall 3 weight 0 backup
+    backend ignition_backend        
+        # Serveurs avec priorités (sans health check HTTP)
+        server ignition-master ignition-master-service:8088 weight 100
+        server ignition-backup ignition-backup-service:8088 weight 0 backup
 ---
 # Deployment HAProxy
 apiVersion: apps/v1
