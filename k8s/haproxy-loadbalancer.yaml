@@ -11,11 +11,10 @@ data:
         log stdout local0 info
         
     defaults
-        mode http
+        mode tcp
         timeout connect 5000ms
         timeout client 50000ms
         timeout server 50000ms
-        option httplog
         log global
         
     # Interface web HAProxy stats
@@ -27,12 +26,17 @@ data:
     
     # Frontend - point d'entrée unique
     frontend ignition_frontend
+        mode tcp
         bind *:8080
         default_backend ignition_backend
         
     # Backend - logique de failover
-    backend ignition_backend        
-        # Serveurs avec priorités (sans health check HTTP)
+    backend ignition_backend
+        # Mode TCP pour éviter les health checks HTTP
+        mode tcp
+        balance first
+        
+        # Serveurs sans health check (considérés toujours UP)
         server ignition-master ignition-master-service:8088 weight 100
         server ignition-backup ignition-backup-service:8088 weight 0 backup
 ---
