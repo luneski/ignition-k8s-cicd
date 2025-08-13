@@ -165,20 +165,20 @@ spec:
         args:
           - |
             echo "Checking SQL Server connectivity..."
-            until /opt/mssql-tools18/bin/sqlcmd -S sql-server-service.database.svc.cluster.local -U sa -P 'Sanofi123!' -C -Q "SELECT 1" > /dev/null 2>&1; do
+            until /opt/mssql-tools/bin/sqlcmd -S sql-server-service.database.svc.cluster.local -U sa -P 'Sanofi123!' -C -Q "SELECT 1" > /dev/null 2>&1; do
               echo "Waiting for SQL Server to be ready..."
               sleep 5
             done
             echo "SQL Server is ready!"
             
             echo "Checking if IgnitionSCADA database exists..."
-            DB_EXISTS=$(/opt/mssql-tools18/bin/sqlcmd -S sql-server-service.database.svc.cluster.local -U sa -P 'Sanofi123!' -C -Q "SELECT COUNT(*) FROM sys.databases WHERE name = 'IgnitionSCADA'" -h -1 2>/dev/null | tr -d ' \n\r')
+            DB_EXISTS=$(/opt/mssql-tools/bin/sqlcmd -S sql-server-service.database.svc.cluster.local -U sa -P 'Sanofi123!' -C -Q "SELECT COUNT(*) FROM sys.databases WHERE name = 'IgnitionSCADA'" -h -1 2>/dev/null | tr -d ' \n\r')
             
             if [ "$DB_EXISTS" = "1" ]; then
               echo "IgnitionSCADA database already exists"
             else
               echo "Creating IgnitionSCADA database..."
-              /opt/mssql-tools18/bin/sqlcmd -S sql-server-service.database.svc.cluster.local -U sa -P 'Sanofi123!' -C -Q "CREATE DATABASE IgnitionSCADA"
+              /opt/mssql-tools/bin/sqlcmd -S sql-server-service.database.svc.cluster.local -U sa -P 'Sanofi123!' -C -Q "CREATE DATABASE IgnitionSCADA"
               echo "IgnitionSCADA database created successfully!"
             fi
             echo "Database initialization completed"
